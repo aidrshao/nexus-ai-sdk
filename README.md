@@ -348,7 +348,7 @@ If you find this project helpful, please consider giving it a ⭐ on [GitHub](ht
 
 ## Changelog
 
-### v0.1.0 (2025-01-03)
+### v0.1.0 (2025-10-04)
 
 - Initial release
 - Text generation (sync, async, streaming)

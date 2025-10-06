@@ -350,7 +350,7 @@ except NetworkError as e:
 
 ---
 
-## [0.1.0] - 2025-01-03 (Updated 2025-10-03)
+## [0.1.0] - 2025-10-04
 
 ### 🔥 BREAKING CHANGE - Knowledge Base Document Upload Architecture (2025-10-03)
 

@@ -74,6 +74,9 @@ dmypy.json
 docs/_build/
 docs/.doctrees/
 
+# Internal documentation (not for public repository)
+docs/internal/
+
 # Temporary files
 *.tmp
 *.bak
