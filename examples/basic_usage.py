@@ -18,6 +18,7 @@ def main():
     try:
         response = client.text.generate(
             prompt="写一首关于春天的短诗，不超过4行",
+            model="gpt-5-mini",  # Recommended: fast and cost-effective
             temperature=0.7,
             max_tokens=100,
         )
@@ -33,6 +34,7 @@ def main():
         print("Streaming response: ", end="", flush=True)
         for chunk in client.text.stream(
             prompt="用一句话介绍人工智能",
+            model="gpt-5-mini",
             max_tokens=50,
         ):
             if "delta" in chunk and "content" in chunk["delta"]:
@@ -48,6 +50,7 @@ def main():
         session = client.sessions.create(
             name="Test Session",
             agent_config={
+                "model": "gpt-5-mini",
                 "temperature": 0.7,
                 "system_prompt": "You are a helpful assistant.",
             },
@@ -76,11 +79,12 @@ def main():
     print("\n=== Example 4: Image Generation ===")
     try:
         print("Generating image (this may take a while)...")
-        image = client.images.generate(
+        image = client.image.generate(
             prompt="A beautiful sunset over mountains, digital art",
-            size="1024x1024",
+            model="doubao-seedream-4-0-250828",  # Default recommended model
+            aspect_ratio="1:1",
         )
-        print(f"Image generated: {image.image_url}")
+        print(f"Image generated: {image.url}")
         print(f"Dimensions: {image.width}x{image.height}")
     except Exception as e:
         print(f"Error: {e}")

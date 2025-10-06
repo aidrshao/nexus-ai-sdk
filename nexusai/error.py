@@ -34,7 +34,9 @@ class APIError(Exception):
 
     def __str__(self) -> str:
         """Return a string representation of the error."""
-        parts = [self.message]
+        # Ensure message is a string
+        message_str = str(self.message) if not isinstance(self.message, str) else self.message
+        parts = [message_str]
         if self.status_code:
             parts.append(f"(HTTP {self.status_code})")
         if self.error_code:
@@ -146,12 +148,46 @@ class ServerError(APIError):
 
 class ValidationError(APIError):
     """
-    Data validation error.
+    Data validation error (HTTP 422).
 
-    Raised when response data fails validation against expected schema.
+    Raised when request data fails server-side validation (Pydantic errors).
+    Contains detailed field-level validation errors.
     """
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        validation_errors: Optional[list] = None,
+        **kwargs,
+    ):
+        """
+        Initialize a validation error.
+
+        Args:
+            message: Human-readable error message
+            validation_errors: List of field-level validation errors from Pydantic
+            **kwargs: Additional arguments passed to APIError
+        """
+        super().__init__(message, **kwargs)
+        self.validation_errors = validation_errors or []
+
+    def __str__(self) -> str:
+        """Return a string representation of the error."""
+        base = super().__str__()
+        if self.validation_errors:
+            # Format validation errors nicely
+            errors = []
+            for err in self.validation_errors[:3]:  # Show first 3 errors
+                if isinstance(err, dict):
+                    field = ".".join(str(loc) for loc in err.get("loc", []))
+                    msg = err.get("msg", "")
+                    errors.append(f"{field}: {msg}")
+            if errors:
+                error_str = "; ".join(errors)
+                if len(self.validation_errors) > 3:
+                    error_str += f" (and {len(self.validation_errors) - 3} more)"
+                return f"{base} - {error_str}"
+        return base
 
 
 class NetworkError(APIError):
@@ -159,6 +195,67 @@ class NetworkError(APIError):
     Network communication error.
 
     Raised when a network error occurs during the request.
+    Examples: connection refused, DNS resolution failure, etc.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        is_retryable: bool = True,
+        **kwargs,
+    ):
+        """
+        Initialize a network error.
+
+        Args:
+            message: Human-readable error message
+            is_retryable: Whether this error can be retried
+            **kwargs: Additional arguments passed to APIError
+        """
+        super().__init__(message, **kwargs)
+        self.is_retryable = is_retryable
+
+
+class FileUploadError(APIError):
+    """
+    File upload error.
+
+    Raised when file upload fails due to format, size, or other issues.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        file_name: Optional[str] = None,
+        file_size: Optional[int] = None,
+        **kwargs,
+    ):
+        """
+        Initialize a file upload error.
+
+        Args:
+            message: Human-readable error message
+            file_name: Name of the file that failed
+            file_size: Size of the file in bytes
+            **kwargs: Additional arguments passed to APIError
+        """
+        super().__init__(message, **kwargs)
+        self.file_name = file_name
+        self.file_size = file_size
+
+    def __str__(self) -> str:
+        """Return a string representation of the error."""
+        base = super().__str__()
+        if self.file_name:
+            return f"{base} (file: {self.file_name})"
+        return base
+
+
+class StreamError(APIError):
+    """
+    Streaming error.
+
+    Raised when SSE stream encounters an error.
     """
 
     pass

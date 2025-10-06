@@ -77,3 +77,69 @@ docs/.doctrees/
 # Temporary files
 *.tmp
 *.bak
+
+# Sensitive files - API keys and credentials
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.json
+secrets.json
+
+# Test files with API keys
+test_api_keys.py
+test_backend_health.py
+test_production_*.py
+test_*_debug.py
+
+# Test output files (may contain sensitive data)
+test_output*.txt
+*_test_output.txt
+session*.json
+session*.txt
+task*.json
+task*.txt
+image_task*.json
+image_task*.txt
+*_result.json
+
+# Internal documentation (may contain sensitive info)
+*_SUMMARY.md
+*_REPORT.md
+*_INSTRUCTIONS.md
+*_GUIDE.md
+RELEASE_*.md
+BACKEND_*.md
+PRODUCTION_*.md
+EMAIL_*.md
+FINAL_*.md
+SDK_*.md
+
+# Claude settings (may contain API keys)
+.claude/
+.claude/*
+!.claude/settings.json
+.claude/settings.local.json
+
+# Release scripts (may contain credentials)
+release.bat
+release.sh
+
+# Comprehensive test files
+test_comprehensive_*.py
+test_failed_*.py
+test_file_*.py
+test_image_*.py
+test_max_*.py
+test_sequence_*.py
+test_session_*.py
+test_asr_*.py
+test_real_*.py
+test_slow_*.py
+test_streaming.py
+
+# 文档
+PUBLIC_*.md
+accptance_*.md
+nexus-ai-sdk-*.md

@@ -1,32 +1,60 @@
 # Nexus AI Python SDK
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.2.1-blue.svg)](https://pypi.org/project/keystone-ai/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Official Python SDK for [Nexus AI](https://nexus-ai.juncai-ai.com) - A unified AI capabilities platform.
 
+## 🎉 Stable Release v0.2.1
+
+**Production Ready** - 95.2% test pass rate with 100% P0 core features passing.
+
+**Installation**:
+```bash
+pip install keystone-ai
+```
+
+**Quick Start**:
+```python
+from nexusai import NexusAIClient
+
+client = NexusAIClient(api_key="your_api_key")
+response = client.text.generate("Hello, AI!")
+print(response.text)
+```
+
 ## Features
 
 - 🚀 **Simple & Intuitive** - Clean API design with sensible defaults
-- 🔄 **Async Support** - Built-in task polling for long-running operations
+- 🔄 **Multi-Model Support** - 6 text models + 2 image models
 - 📡 **Streaming** - Real-time streaming for text generation
 - 💬 **Session Management** - Stateful conversations with automatic context handling
 - 🧠 **Knowledge Bases** - RAG capabilities with semantic search
-- 🎨 **Multi-Modal** - Text, images, audio (ASR/TTS), and document processing
+- 🎨 **Multi-Modal** - Text, images, audio (ASR), and document processing
 - 🔐 **Type-Safe** - Full type hints with Pydantic models
-- 🌐 **Development Friendly** - Defaults to localhost for easy development
+- 🌐 **Production Ready** - Defaults to production API at `https://nexus-ai.juncai-ai.com/api/v1`
 
 ## Installation
 
 ```bash
-pip install nexus-ai-sdk
+pip install keystone-ai
 ```
 
-Or install from source:
+**国内镜像加速**:
+```bash
+# 清华镜像
+pip install keystone-ai -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 阿里云镜像
+pip install keystone-ai -i https://mirrors.aliyun.com/pypi/simple/
+```
+
+**从源码安装**:
 
 ```bash
-git clone https://github.com/nexus-ai/python-sdk.git
-cd python-sdk
+git clone https://github.com/aidrshao/nexus-ai-sdk.git
+cd nexus-ai-sdk
 poetry install
 ```
 
@@ -38,8 +66,8 @@ Create a `.env` file in your project root:
 
 ```bash
 NEXUS_API_KEY=nxs_your_api_key_here
-# Optional: Set base URL (defaults to http://localhost:8000/api/v1)
-# NEXUS_BASE_URL=https://nexus-ai.juncai-ai.com/api/v1
+# SDK automatically uses production: https://nexus-ai.juncai-ai.com/api/v1
+# For local development, set: NEXUS_BASE_URL=http://localhost:8000/api/v1
 ```
 
 ### 2. Initialize the client
@@ -47,10 +75,13 @@ NEXUS_API_KEY=nxs_your_api_key_here
 ```python
 from nexusai import NexusAIClient
 
-# Reads configuration from environment variables
+# Simple - uses production API automatically
+client = NexusAIClient(api_key="nxs_your_api_key")
+
+# Or read from environment variables
 client = NexusAIClient()
 
-# Or configure explicitly
+# For local development
 client = NexusAIClient(
     api_key="nxs_your_api_key",
     base_url="http://localhost:8000/api/v1"
@@ -60,20 +91,24 @@ client = NexusAIClient(
 ### 3. Generate text
 
 ```python
-# Simple mode (省心模式) - uses default provider and model
+# Simple mode (省心模式) - uses default model
 response = client.text.generate("写一首关于春天的诗")
 print(response.text)
 
-# Expert mode (专家模式) - specify provider and model
+# With model selection
 response = client.text.generate(
     prompt="Explain quantum computing",
-    provider="openai",
-    model="gpt-4",
+    model="gpt-5-mini",       # Recommended: fast and cost-effective
     temperature=0.7,
     max_tokens=500
 )
 print(response.text)
 print(f"Tokens used: {response.usage.total_tokens}")
+
+# Available models (三档体系):
+# 🥇 高端: "gpt-5" (fastest premium), "gemini-2.5-pro" (strongest reasoning)
+# 🥈 中端: "gpt-5-mini" (recommended), "gpt-4o-mini" (alternative)
+# 🥉 经济: "deepseek-v3.2-exp" (cheapest)
 ```
 
 ### 4. Stream text generation
@@ -92,7 +127,7 @@ print()
 session = client.sessions.create(
     name="My Chat",
     agent_config={
-        "model": "gpt-4",
+        "model": "gpt-5-mini",   # Recommended model for conversations
         "temperature": 0.7
     }
 )
@@ -114,18 +149,20 @@ for message in history:
 
 ```python
 # Simple mode
-image = client.images.generate("A futuristic city")
-print(image.image_url)
+image = client.image.generate("A futuristic city")
+print(image.url)
 
 # With options
-image = client.images.generate(
+image = client.image.generate(
     prompt="A sunset over mountains, digital art",
-    provider="dmxapi",
-    model="gemini-2.5-flash-image",
-    size="1920x1080",
-    quality="hd"
+    model="doubao-seedream-4-0-250828",  # Default recommended model (ByteDance Doubao)
+    aspect_ratio="16:9",                  # Use ratio instead of pixel size
+    num_images=1
 )
-print(f"Image: {image.image_url} ({image.width}x{image.height})")
+print(f"Image: {image.url}")
+
+# Supported aspect ratios: "1:1", "16:9", "9:16", "4:3", "3:4", "21:9"
+# Image models: "doubao-seedream-4-0-250828" (default), "gemini-2.5-flash-image" (alternative)
 ```
 
 ### 7. Speech-to-Text (ASR)
@@ -184,30 +221,32 @@ The SDK can be configured via environment variables or constructor parameters:
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `NEXUS_API_KEY` | (required) | Your API key |
-| `NEXUS_BASE_URL` | `http://localhost:8000/api/v1` | API base URL |
+| `NEXUS_BASE_URL` | `https://nexus-ai.juncai-ai.com/api/v1` | API base URL |
 | `NEXUS_TIMEOUT` | `30` | Request timeout (seconds) |
 | `NEXUS_MAX_RETRIES` | `3` | Maximum retry attempts |
 | `NEXUS_POLL_INTERVAL` | `2` | Task polling interval (seconds) |
 | `NEXUS_POLL_TIMEOUT` | `300` | Task polling timeout (seconds) |
 
-## Development Mode vs Production
+## Production vs Development Mode
 
-**Development Mode (Default)**:
+**Production Mode (Default)**:
 ```python
-# Uses localhost by default
-client = NexusAIClient()  # Points to http://localhost:8000/api/v1
+# Uses production API by default - zero configuration needed!
+client = NexusAIClient(api_key="nxs_your_api_key")
+# → Connects to https://nexus-ai.juncai-ai.com/api/v1
 ```
 
-**Production Mode**:
+**Local Development Mode**:
 ```bash
 # Set environment variable
-export NEXUS_BASE_URL=https://nexus-ai.juncai-ai.com/api/v1
+export NEXUS_BASE_URL=http://localhost:8000/api/v1
 ```
 
 Or in code:
 ```python
 client = NexusAIClient(
-    base_url="https://nexus-ai.juncai-ai.com/api/v1"
+    api_key="nxs_dev_key",
+    base_url="http://localhost:8000/api/v1"
 )
 ```
 
@@ -251,18 +290,34 @@ with NexusAIClient() as client:
 # Client automatically closed
 ```
 
-## API Reference
+## 📚 Complete Documentation
 
-For detailed API documentation, see [docs/api_reference.md](docs/api_reference.md).
+**📖 [Complete Documentation Index](https://github.com/aidrshao/nexus-ai-sdk/blob/main/DOCUMENTATION.md)** - All documentation in one place
 
-## Examples
+### Quick Links
+- **[Quick Start Guide](https://github.com/aidrshao/nexus-ai-sdk/blob/main/QUICKSTART_GUIDE.md)** - 5-minute tutorial to get started
+- **[API Reference for Developers](https://github.com/aidrshao/nexus-ai-sdk/blob/main/API_REFERENCE_FOR_DEVELOPERS.md)** - Complete API documentation
+- **[Application Developer FAQ](https://github.com/aidrshao/nexus-ai-sdk/blob/main/APPLICATION_DEVELOPER_RESPONSE.md)** - Common questions answered
+- **[Error Handling Guide](https://github.com/aidrshao/nexus-ai-sdk/blob/main/ERROR_HANDLING_QUICK_REFERENCE.md)** - Best practices for error handling
+- **[Model Selection Guide](https://github.com/aidrshao/nexus-ai-sdk/blob/main/MODEL_UPDATE_SUMMARY.md)** - Choosing the right model
+- **[Changelog](https://github.com/aidrshao/nexus-ai-sdk/blob/main/CHANGELOG.md)** - Version history and updates
 
-Check out the [examples/](examples/) directory for more usage examples:
+### Code Examples
+Check out the [examples/](https://github.com/aidrshao/nexus-ai-sdk/tree/main/examples) directory:
 
-- `basic_usage.py` - Core features demonstration
-- `streaming_example.py` - Streaming text generation
-- `session_chat.py` - Multi-turn conversations
-- `knowledge_base_rag.py` - RAG with knowledge bases
+- **[basic_usage.py](https://github.com/aidrshao/nexus-ai-sdk/blob/main/examples/basic_usage.py)** - Core features demonstration
+- **[error_handling.py](https://github.com/aidrshao/nexus-ai-sdk/blob/main/examples/error_handling.py)** - Error handling patterns
+
+### Model Documentation
+
+**Text Models (6 available)**:
+- 🥇 Premium: `gpt-5`, `gemini-2.5-pro`
+- 🥈 Standard: `gpt-5-mini`
+- 🥉 Budget: `deepseek-v3.2-exp` (default), `gpt-4o-mini`
+
+**Image Models (2 available)**:
+- `doubao-seedream-4-0-250828` (default)
+- `gemini-2.5-flash-image`
 
 ## Requirements
 
@@ -279,11 +334,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Support & Community
 
-- Documentation: https://nexus-ai.juncai-ai.com/docs
-- Issues: https://github.com/nexus-ai/python-sdk/issues
-- Email: support@nexus-ai.com
+- **PyPI**: https://pypi.org/project/keystone-ai/
+- **Documentation**: https://nexus-ai.juncai-ai.com/docs
+- **GitHub**: https://github.com/aidrshao/nexus-ai-sdk
+- **Issues**: https://github.com/aidrshao/nexus-ai-sdk/issues
+- **Email**: support@nexus-ai.com
+
+## Star History
+
+If you find this project helpful, please consider giving it a ⭐ on [GitHub](https://github.com/aidrshao/nexus-ai-sdk)!
 
 ## Changelog
 

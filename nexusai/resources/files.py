@@ -2,7 +2,7 @@
 
 from typing import BinaryIO, Union, Dict, Any
 from pathlib import Path
-from nexusai.models import FileMetadata
+from nexusai.models import FileMetadata, FileListResponse
 
 
 class FilesResource:
@@ -84,19 +84,21 @@ class FilesResource:
             # Prepare multipart form data
             files = {"file": (actual_filename, file_obj)}
 
-            # Make request (note: we need to bypass JSON content-type for multipart)
-            # This requires a special handling in the client
+            # Make request with httpx directly to avoid Content-Type: application/json
             import httpx
 
             url = f"{self._client.base_url}/files"
             headers = {
                 "Authorization": f"Bearer {self._client.api_key}",
-                "User-Agent": f"nexus-ai-python/{self._client._default_headers()['User-Agent'].split('/')[-1]}",
+                "User-Agent": f"nexus-ai-python/0.1.0",
+                # Do NOT set Content-Type - let httpx set it automatically for multipart
             }
 
-            response = self._client.client.post(url, files=files, headers=headers)
-            self._client._check_response_status(response)
-            data = response.json()
+            # Use a new httpx client instead of self._client.client to avoid default headers
+            with httpx.Client() as upload_client:
+                response = upload_client.post(url, files=files, headers=headers, timeout=self._client.timeout)
+                self._client._check_response_status(response)
+                data = response.json()
 
             return FileMetadata(**data)
 
@@ -150,3 +152,33 @@ class FilesResource:
             ```
         """
         return self._client.request("DELETE", f"/files/{file_id}")
+
+    def list(self, page: int = 1, per_page: int = 20) -> FileListResponse:
+        """
+        List all files uploaded by current API key.
+
+        Args:
+            page: Page number (default: 1)
+            per_page: Items per page, max 100 (default: 20)
+
+        Returns:
+            FileListResponse with files list and pagination info
+
+        Raises:
+            InvalidRequestError: If pagination parameters are invalid
+            APIError: If retrieval fails
+
+        Example:
+            ```python
+            # Get first page
+            result = client.files.list(page=1, per_page=10)
+            print(f"Total files: {result.total}")
+            for file in result.files:
+                print(f"- {file.filename} ({file.size} bytes)")
+
+            # Get second page
+            result = client.files.list(page=2, per_page=10)
+            ```
+        """
+        response = self._client.request("GET", f"/files?page={page}&per_page={per_page}")
+        return FileListResponse(**response)

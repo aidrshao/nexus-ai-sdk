@@ -14,6 +14,8 @@ from nexusai.error import (
     InvalidRequestError,
     ServerError,
     NetworkError,
+    ValidationError,
+    StreamError,
 )
 from nexusai.config import config
 
@@ -58,12 +60,14 @@ class InternalClient:
                 "API key is required. Set NEXUS_API_KEY environment variable or pass api_key parameter."
             )
 
-        # Create httpx client with retry transport
+        # Create httpx client with retry transport and connection limits
         transport = httpx.HTTPTransport(retries=self.max_retries)
+        limits = httpx.Limits(max_connections=10, max_keepalive_connections=5)
         self.client = httpx.Client(
             timeout=self.timeout,
             headers=self._default_headers(),
             transport=transport,
+            limits=limits,
         )
 
     def _default_headers(self) -> Dict[str, str]:
@@ -170,6 +174,7 @@ class InternalClient:
                 self._check_response_status(response)
 
                 # Parse SSE stream
+                chunk_count = 0
                 for line in response.iter_lines():
                     line = line.strip()
                     if not line:
@@ -184,15 +189,32 @@ class InternalClient:
                             break
 
                         try:
+                            chunk_count += 1
                             yield json.loads(data)
-                        except json.JSONDecodeError:
-                            # Skip invalid JSON lines
-                            continue
+                        except json.JSONDecodeError as e:
+                            # Raise error for malformed SSE data
+                            raise StreamError(
+                                f"Invalid JSON in SSE stream at chunk {chunk_count}: {data[:100]}"
+                            ) from e
+
+                # Check if we received any chunks
+                if chunk_count == 0:
+                    raise StreamError(
+                        "No data received from stream. Server may not support SSE streaming."
+                    )
 
         except httpx.TimeoutException as e:
             raise APITimeoutError(f"Stream timed out after {self.timeout}s") from e
         except httpx.NetworkError as e:
-            raise NetworkError(f"Network error during streaming: {str(e)}") from e
+            raise NetworkError(
+                f"Network error during streaming: {str(e)}",
+                is_retryable=True,
+            ) from e
+        except StreamError:
+            # Re-raise StreamError without wrapping
+            raise
+        except Exception as e:
+            raise StreamError(f"Unexpected error during streaming: {str(e)}") from e
 
     def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
         """
@@ -253,6 +275,28 @@ class InternalClient:
             raise PermissionError(message, status_code, error_code, error_data)
         elif status_code == 404:
             raise NotFoundError(message, status_code, error_code, error_data)
+        elif status_code == 422:
+            # Validation error (Pydantic) - extract field errors if available
+            validation_errors = None
+            if isinstance(error_data, dict) and "detail" in error_data:
+                detail = error_data["detail"]
+                # Pydantic returns list of validation errors
+                if isinstance(detail, list):
+                    validation_errors = detail
+                    # Create a more readable message
+                    if validation_errors:
+                        first_error = validation_errors[0]
+                        if isinstance(first_error, dict):
+                            field = ".".join(str(loc) for loc in first_error.get("loc", []))
+                            msg = first_error.get("msg", "")
+                            message = f"Validation error: {field}: {msg}"
+            raise ValidationError(
+                message,
+                validation_errors=validation_errors,
+                status_code=status_code,
+                error_code=error_code,
+                response_body=error_data,
+            )
         elif status_code == 429:
             retry_after = response.headers.get("X-RateLimit-Reset")
             raise RateLimitError(

@@ -2,7 +2,7 @@
 
 from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # Task models
@@ -107,6 +107,24 @@ class FileMetadata(BaseModel):
     content_type: str = Field(..., description="MIME type of the file")
     size: int = Field(..., description="File size in bytes")
     created_at: Optional[datetime] = Field(None, description="Upload timestamp")
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def parse_datetime(cls, v):
+        """Parse datetime, handling trailing 'Z' suffix."""
+        if isinstance(v, str) and v.endswith("Z"):
+            # Remove trailing 'Z' and parse
+            v = v[:-1]
+        return v
+
+
+class FileListResponse(BaseModel):
+    """File list response with pagination."""
+
+    files: List["FileMetadata"] = Field(..., description="List of files")
+    total: int = Field(..., description="Total number of files")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Items per page")
 
 
 # Knowledge base models

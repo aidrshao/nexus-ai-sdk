@@ -1,8 +1,8 @@
 """Constants used throughout the SDK."""
 
 # API endpoints
-DEFAULT_BASE_URL = "http://localhost:8000/api/v1"
-PRODUCTION_BASE_URL = "https://nexus-ai.juncai-ai.com/api/v1"
+DEFAULT_BASE_URL = "https://nexus-ai.juncai-ai.com/api/v1"  # Production
+DEVELOPMENT_BASE_URL = "http://localhost:8000/api/v1"        # Local development
 
 # Timeout settings (seconds)
 DEFAULT_TIMEOUT = 30.0

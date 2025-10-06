@@ -26,7 +26,8 @@ class TextResource:
 
     def generate(
         self,
-        prompt: str,
+        prompt: Optional[str] = None,
+        messages: Optional[list] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
@@ -37,7 +38,10 @@ class TextResource:
         Generate text synchronously.
 
         Args:
-            prompt: Input prompt for text generation
+            prompt: Input prompt for text generation (simple format)
+            messages: List of message dicts for multi-turn conversation format.
+                     Each message should have 'role' and 'content' fields.
+                     Example: [{"role": "user", "content": "Hello"}]
             provider: AI service provider (e.g., "openai", "dmxapi", "anthropic").
                      If not specified, uses default provider.
             model: Model name (e.g., "gpt-4", "gpt-4o-mini").
@@ -53,6 +57,7 @@ class TextResource:
         Raises:
             InvalidRequestError: If request parameters are invalid
             APIError: If generation fails
+            ValueError: If neither prompt nor messages is provided, or both are provided
 
         Example:
             ```python
@@ -60,9 +65,19 @@ class TextResource:
 
             client = NexusAIClient()
 
-            # Simple mode (省心模式)
-            response = client.text.generate("写一首关于春天的诗")
+            # Simple mode with prompt (省心模式)
+            response = client.text.generate(prompt="写一首关于春天的诗")
             print(response.text)
+
+            # Messages format for multi-turn conversation
+            response = client.text.generate(
+                messages=[
+                    {"role": "user", "content": "我叫张三"},
+                    {"role": "assistant", "content": "你好张三"},
+                    {"role": "user", "content": "我叫什么名字?"}
+                ]
+            )
+            print(response.text)  # Should mention "张三"
 
             # Expert mode (专家模式)
             response = client.text.generate(
@@ -76,11 +91,22 @@ class TextResource:
             print(f"Tokens used: {response.usage.total_tokens}")
             ```
         """
+        # Validate input: must provide either prompt or messages, but not both
+        if prompt and messages:
+            raise ValueError("Cannot provide both 'prompt' and 'messages'. Use one or the other.")
+        if not prompt and not messages:
+            raise ValueError("Must provide either 'prompt' or 'messages'.")
+
         # Build request body
         request_body = {
             "task_type": TASK_TYPE_TEXT_GENERATION,
-            "input": {"prompt": prompt},
         }
+
+        # Set input format based on what was provided
+        if messages:
+            request_body["input"] = {"messages": messages}
+        else:
+            request_body["input"] = {"prompt": prompt}
 
         # Add optional provider and model
         if provider:
@@ -110,7 +136,8 @@ class TextResource:
 
     def generate_async(
         self,
-        prompt: str,
+        prompt: Optional[str] = None,
+        messages: Optional[list] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
@@ -124,7 +151,8 @@ class TextResource:
         Useful for long-running text generation tasks.
 
         Args:
-            prompt: Input prompt for text generation
+            prompt: Input prompt for text generation (simple format)
+            messages: List of message dicts for multi-turn conversation format
             provider: AI service provider
             model: Model name
             temperature: Sampling temperature (0.0 to 2.0)
@@ -138,6 +166,7 @@ class TextResource:
             InvalidRequestError: If request parameters are invalid
             APITimeoutError: If generation times out
             APIError: If generation fails
+            ValueError: If neither prompt nor messages is provided
 
         Example:
             ```python
@@ -148,11 +177,22 @@ class TextResource:
             print(response.text)
             ```
         """
-        # Build request body (same as generate)
+        # Validate input
+        if prompt and messages:
+            raise ValueError("Cannot provide both 'prompt' and 'messages'.")
+        if not prompt and not messages:
+            raise ValueError("Must provide either 'prompt' or 'messages'.")
+
+        # Build request body
         request_body = {
             "task_type": TASK_TYPE_TEXT_GENERATION,
-            "input": {"prompt": prompt},
         }
+
+        # Set input format
+        if messages:
+            request_body["input"] = {"messages": messages}
+        else:
+            request_body["input"] = {"prompt": prompt}
 
         if provider:
             request_body["provider"] = provider
@@ -189,7 +229,8 @@ class TextResource:
 
     def stream(
         self,
-        prompt: str,
+        prompt: Optional[str] = None,
+        messages: Optional[list] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
@@ -203,7 +244,8 @@ class TextResource:
         display of generation progress.
 
         Args:
-            prompt: Input prompt for text generation
+            prompt: Input prompt for text generation (simple format)
+            messages: List of message dicts for multi-turn conversation format
             provider: AI service provider
             model: Model name
             temperature: Sampling temperature (0.0 to 2.0)
@@ -218,6 +260,7 @@ class TextResource:
         Raises:
             InvalidRequestError: If request parameters are invalid
             APIError: If generation fails
+            ValueError: If neither prompt nor messages is provided
 
         Example:
             ```python
@@ -226,18 +269,29 @@ class TextResource:
             client = NexusAIClient()
 
             # Stream text generation
-            for chunk in client.text.stream("Tell me a story"):
+            for chunk in client.text.stream(prompt="Tell me a story"):
                 if "delta" in chunk:
                     print(chunk["delta"].get("content", ""), end="", flush=True)
             print()  # New line after streaming completes
             ```
         """
-        # Build request body
+        # Validate input
+        if prompt and messages:
+            raise ValueError("Cannot provide both 'prompt' and 'messages'.")
+        if not prompt and not messages:
+            raise ValueError("Must provide either 'prompt' or 'messages'.")
+
+        # Build request body with stream parameter
         request_body = {
             "task_type": TASK_TYPE_TEXT_GENERATION,
-            "input": {"prompt": prompt},
-            "stream": True,  # Enable streaming
+            "stream": True,  # Stream parameter must be in request body per API spec
         }
+
+        # Set input format
+        if messages:
+            request_body["input"] = {"messages": messages}
+        else:
+            request_body["input"] = {"prompt": prompt}
 
         if provider:
             request_body["provider"] = provider
@@ -250,5 +304,9 @@ class TextResource:
         request_body["config"] = config_params
 
         # Stream response
-        for chunk in self._client.stream("POST", "/invoke", json_data=request_body):
+        for chunk in self._client.stream(
+            "POST",
+            "/invoke",
+            json_data=request_body,
+        ):
             yield chunk

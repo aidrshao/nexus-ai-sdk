@@ -44,7 +44,7 @@ class Session:
         """Get the session name."""
         return self._data.get("name")
 
-    def invoke(self, prompt: str, **kwargs) -> SessionResponse:
+    def invoke(self, prompt: str, config: Optional[Dict[str, Any]] = None, **kwargs) -> SessionResponse:
         """
         Send a message in this session (synchronous).
 
@@ -53,7 +53,9 @@ class Session:
 
         Args:
             prompt: User message content
-            **kwargs: Additional configuration (e.g., temperature, max_tokens)
+            config: Optional configuration to temporarily override session settings
+                   (e.g., {"temperature": 0.9, "max_tokens": 500})
+            **kwargs: Additional parameters (for future compatibility)
 
         Returns:
             SessionResponse containing assistant's reply
@@ -74,13 +76,23 @@ class Session:
             # Follow-up message - session remembers context
             response = session.invoke("What's my name?")
             print(response.response.content)  # Will remember "Alice"
+
+            # Temporarily override temperature
+            response = session.invoke(
+                "Tell me a creative story",
+                config={"temperature": 1.2}
+            )
             ```
         """
+        # Backend expects: {"input": {"prompt": "..."}, "config": {...}, "stream": false}
         request_body = {
-            "prompt": prompt,
+            "input": {"prompt": prompt},
             "stream": False,
-            **kwargs,
         }
+
+        # Add config if provided
+        if config:
+            request_body["config"] = config
 
         response = self._client.request(
             "POST",
@@ -88,13 +100,20 @@ class Session:
             json_data=request_body,
         )
 
-        # Parse response
-        response_data = response.get("response", {})
-        usage_data = response.get("usage")
+        # Parse response - backend returns {"output": {"text": "..."}, "metadata": {...}}
+        output_data = response.get("output", {})
+        metadata = response.get("metadata", {})
+        usage_data = metadata.get("usage")
+
+        # Convert output.text to Message format
+        message_data = {
+            "role": "assistant",
+            "content": output_data.get("text", "")
+        }
 
         return SessionResponse(
             session_id=response.get("session_id", self.id),
-            response=Message(**response_data),
+            response=Message(**message_data),
             usage=Usage(**usage_data) if usage_data else None,
         )
 
